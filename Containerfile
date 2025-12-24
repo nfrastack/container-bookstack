@@ -17,7 +17,7 @@ LABEL \
         org.opencontainers.image.licenses="MIT"
 
 ARG \
-    BOOKSTACK_VERSION="v25.11.6" \
+    BOOKSTACK_VERSION="v25.12" \
     BOOKSTACK_REPO_URL="https://github.com/BookStackApp/BookStack"
 
 COPY CHANGELOG.md /usr/src/container/CHANGELOG.md
@@ -34,6 +34,7 @@ ENV \
     PHP_MODULE_ENABLE_FILEINFO=TRUE \
     PHP_MODULE_ENABLE_TOKENIZER=TRUE \
     PHP_MODULE_ENABLE_XMLWRITER=TRUE \
+    PHP_MODULE_ENABLE_ZIP=TRUE \
     NGINX_WEBROOT=/www/bookstack \
     NGINX_SITE_ENABLED=bookstack \
     CONTAINER_ENABLE_MESSAGING=TRUE \
@@ -51,8 +52,8 @@ RUN echo "" && \
                                 jpegoptim \
                                 libmemcached \
                                 optipng \
-                                " \
-                                && \
+                              " \
+                              && \
     source /container/base/functions/container/build && \
     container_build_log image && \
     package update && \
@@ -65,16 +66,17 @@ RUN echo "" && \
     php-ext reset && \
     php-ext enable core && \
     \
-    clone_git_repo "${BOOKSTACK_REPO_URL}" "${BOOKSTACK_VERSION}" /container/data/bookstack-install && \
-    if [ -d "/build-assets/src" ] ; then cp -Rp /build-assets/src/* /container/data/bookstack-install ; fi; \
-    if [ -d "/build-assets/scripts" ] ; then for script in /build-assets/scripts/*.sh; do echo "** Applying $script"; bash $script; done && \ ; fi ; \
+    clone_git_repo "${BOOKSTACK_REPO_URL}" "${BOOKSTACK_VERSION}" /container/data/bookstack/install && \
+    build_assets /build-assets/src "${GIT_REPO_BOOKSTACK}" && \
+    build_assets scripts && \
     composer install && \
     \
-    rm -rf /container/data/bookstack-install/.git \
-           /container/data/bookstack-install/*.yml \
-           /container/data/bookstack-install/dev \
-           /container/data/bookstack-install/php*.xml \
-           /container/data/bookstack-install/tests \
+    rm -rf \
+           /container/data/bookstack/install/.git \
+           /container/data/bookstack/install/*.yml \
+           /container/data/bookstack/install/dev \
+           /container/data/bookstack/install/php*.xml \
+           /container/data/bookstack/install/tests \
            && \
     container_build_log add "BookStack ${BOOKSTACK_VERSION}" "${BOOKSTACK_REPO_URL}" && \
     \

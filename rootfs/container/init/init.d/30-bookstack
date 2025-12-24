@@ -21,7 +21,7 @@ ln -sf "${LOG_PATH}" "${NGINX_WEBROOT}"/storage/logs
 ### Check if New Install
 if [ ! -f "${NGINX_WEBROOT}"/server.php ]; then
     print_warn "Potential New Installation / Standalone Installation Detected - Copying Bookstack Sourcecode"
-    cp -R /container/data/bookstack-install/* "${NGINX_WEBROOT}"
+    cp -R /container/data/bookstack/install/* "${NGINX_WEBROOT}"
 
     ### If running with /www/html or NGINX_WEBROOT mapped, then create persistent storage
     ### Storage redirection
@@ -61,7 +61,7 @@ else
     if var_true "${ENABLE_AUTO_UPDATE}"; then
         if [ "${BOOKSTACK_VERSION}" != $(head -n 1 "${NGINX_WEBROOT}"/.bookstack-version | awk '{print $1'}) ]; then
             print_warn "Detected in place Bookstack version $(head -n 1 "${NGINX_WEBROOT}"/.bookstack-version | awk "{print $1"}) - Upgrading to ${BOOKSTACK_VERSION}"
-            cp -aR /container/data/bookstack-install/* "${NGINX_WEBROOT}"
+            cp -aR /container/data/bookstack/install/* "${NGINX_WEBROOT}"
             chown -R "${NGINX_USER}":"${NGINX_GROUP}" "${NGINX_WEBROOT}"
             cd "${NGINX_WEBROOT}" || exit
             silent sudo -u "${NGINX_USER}" sudo -u "${NGINX_USER}" php artisan migrate --force
