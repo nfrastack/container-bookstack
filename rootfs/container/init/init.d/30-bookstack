@@ -1,5 +1,5 @@
 #!/command/with-contenv bash
-# SPDX-FileCopyrightText: © 2025 Nfrastack <code@nfrastack.com>
+# SPDX-FileCopyrightText: © 2026 Nfrastack <code@nfrastack.com>
 #
 # SPDX-License-Identifier: MIT
 
@@ -10,16 +10,15 @@ SERVICE_NAME="bookstack"
 sanity_db
 db_ready mariadb
 
-### Logfile redirection
 mkdir -p "${LOG_PATH}"
 touch "${LOG_PATH%/}"/"${LOG_FILE}"
 create_logrotate bookstack ${LOG_PATH}/${LOG_FILE} none ${NGINX_USER} ${NGINX_GROUP}
 chown -R "${NGINX_USER}":"${NGINX_GROUP}" "${LOG_PATH}"
-rm -rf "${NGINX_WEBROOT}"/storage/logs
-ln -sf "${LOG_PATH}" "${NGINX_WEBROOT}"/storage/logs
+rm -rf "${NGINX_WEBROOT%/}"/storage/logs
+ln -sf "${LOG_PATH}" "${NGINX_WEBROOT%/}"/storage/logs
 
 ### Check if New Install
-if [ ! -f "${NGINX_WEBROOT}"/server.php ]; then
+if [ ! -f "${NGINX_WEBROOT%/}"/server.php ]; then
     print_warn "Potential New Installation / Standalone Installation Detected - Copying Bookstack Sourcecode"
     cp -R /container/data/bookstack/install/* "${NGINX_WEBROOT}"
 
@@ -28,45 +27,45 @@ if [ ! -f "${NGINX_WEBROOT}"/server.php ]; then
     if [ -d "/data" ]; then
         print_warn "Detected /data directory - Persistently saving settings/sessions/cache/uploads/modules"
         if [ ! -d "/data/storage" ]; then
-            cp -R "${NGINX_WEBROOT}"/storage /data
+            cp -R "${NGINX_WEBROOT%/}"/storage /data
         fi
-        rm -rf "${NGINX_WEBROOT}"/storage
-        ln -sf /data/storage "${NGINX_WEBROOT}"/storage
+        rm -rf "${NGINX_WEBROOT%/}"/storage
+        ln -sf /data/storage "${NGINX_WEBROOT%/}"/storage
         if [ ! -d "/data/uploads" ]; then
-            cp -R "${NGINX_WEBROOT}"/public/uploads /data
+            cp -R "${NGINX_WEBROOT%/}"/public/uploads /data
         fi
-        rm -rf "${NGINX_WEBROOT}"/public/uploads
-        ln -s /data/uploads "${NGINX_WEBROOT}"/public/uploads
+        rm -rf "${NGINX_WEBROOT%/}"/public/uploads
+        ln -s /data/uploads "${NGINX_WEBROOT%/}"/public/uploads
         if var_true "${MAP_THEMES}" ; then
             if [ ! -d "/data/themes" ]; then
-                cp -R "${NGINX_WEBROOT}"/themes /data
+                cp -R "${NGINX_WEBROOT%/}"/themes /data
             fi
-            rm -rf "${NGINX_WEBROOT}"/themes
-            ln -s /data/themes "${NGINX_WEBROOT}"/themes
+            rm -rf "${NGINX_WEBROOT%/}"/themes
+            ln -s /data/themes "${NGINX_WEBROOT%/}"/themes
         fi
 
-        ln -sf /data/config "${NGINX_WEBROOT}"/.env
+        ln -sf /data/config "${NGINX_WEBROOT%/}"/.env
         touch /data/config
-        silent chown "${NGINX_USER}":"${NGINX_GROUP}" "${NGINX_WEBROOT}"/.env
-        ln -sf /data/.bookstack-version "${NGINX_WEBROOT}"/.bookstack-version
+        silent chown "${NGINX_USER}":"${NGINX_GROUP}" "${NGINX_WEBROOT%/}"/.env
+        ln -sf /data/.bookstack-version "${NGINX_WEBROOT%/}"/.bookstack-version
         chown -R "${NGINX_USER}":"${NGINX_GROUP}" /data
     fi
 
     ### Auto Upgrade functionality
-    if [ ! -f "${NGINX_WEBROOT}/.bookstack-version" ]; then
-        echo "${BOOKSTACK_VERSION} first installed on $(date)" >> "${NGINX_WEBROOT}"/.bookstack-version
+    if [ ! -f ""${NGINX_WEBROOT%/}"/.bookstack-version" ]; then
+        echo "${BOOKSTACK_VERSION} first installed on $(date)" >> "${NGINX_WEBROOT%/}"/.bookstack-version
     fi
     chown -R "${NGINX_USER}":"${NGINX_GROUP}" "${NGINX_WEBROOT}"
 else
     if var_true "${ENABLE_AUTO_UPDATE}"; then
-        if [ "${BOOKSTACK_VERSION}" != $(head -n 1 "${NGINX_WEBROOT}"/.bookstack-version | awk '{print $1'}) ]; then
-            print_warn "Detected in place Bookstack version $(head -n 1 "${NGINX_WEBROOT}"/.bookstack-version | awk "{print $1"}) - Upgrading to ${BOOKSTACK_VERSION}"
+        if [ "${BOOKSTACK_VERSION}" != $(head -n 1 "${NGINX_WEBROOT%/}"/.bookstack-version | awk '{print $1'}) ]; then
+            print_warn "Detected in place Bookstack version $(head -n 1 "${NGINX_WEBROOT%/}"/.bookstack-version | awk "{print $1"}) - Upgrading to ${BOOKSTACK_VERSION}"
             cp -aR /container/data/bookstack/install/* "${NGINX_WEBROOT}"
             chown -R "${NGINX_USER}":"${NGINX_GROUP}" "${NGINX_WEBROOT}"
             cd "${NGINX_WEBROOT}" || exit
             silent sudo -u "${NGINX_USER}" sudo -u "${NGINX_USER}" php artisan migrate --force
             sed -i --follow-symlinks "1 i\
-            ${BOOKSTACK_VERSION} upgraded on $(date)" "${NGINX_WEBROOT}"/.bookstack-version
+            ${BOOKSTACK_VERSION} upgraded on $(date)" "${NGINX_WEBROOT%/}"/.bookstack-version
         fi
     fi
 fi
@@ -619,7 +618,7 @@ EOF
 
     ### Write the Configuration File
     transform_var file APP_KEY
-    cat >"${NGINX_WEBROOT}"/.env <<EOF
+    cat >"${NGINX_WEBROOT%/}"/.env <<EOF
 ## Custom Generated Bookstack Configuration! Do not edit, instead set ENV Vars
 ## If you want to use your own configuration files set SETUP_TYPE=MANUAL when starting container
 ## Last Generated on $(date)
@@ -673,8 +672,8 @@ ${iframehosts}
 ${ssrhosts}
 EOF
 
-    chown -R "${NGINX_USER}":"${NGINX_GROUP}" "${NGINX_WEBROOT}"/.env
-    chmod 0755 "${NGINX_WEBROOT}"/.env
+    chown -R "${NGINX_USER}":"${NGINX_GROUP}" "${NGINX_WEBROOT%/}"/.env
+    chmod 0755 "${NGINX_WEBROOT%/}"/.env
 fi
 
 ## Generate Key
@@ -682,7 +681,7 @@ cd "${NGINX_WEBROOT}"
 silent sudo -u "${NGINX_USER}" php artisan key:generate --force
 
 ## Cleanup
-cd "${NGINX_WEBROOT}"/
+cd "${NGINX_WEBROOT%/}"/
 silent sudo -u "${NGINX_USER}" php artisan cache:clear
 silent sudo -u "${NGINX_USER}" php artisan view:clear
 
@@ -692,12 +691,32 @@ transform_var file \
                 DB_NAME \
                 DB_PASS \
                 DB_PORT \
+                DB_SSL \
                 DB_USER
 db_ready mariadb
 
+case "${DB_SSL,,}" in
+    true )
+        _mysql_ssl="--ssl"
+    ;;
+    false )
+        _mysql_ssl="--skip-ssl"
+    ;;
+esac
+if mariadb ${_mysql_ssl} -u$DB_USER -p$DB_PASS -h$DB_HOST -P$DB_PORT -e "SELECT 1;" "$DB_NAME" > /dev/null 2>&1; then
+    if mariadb ${_mysql_ssl} -u$DB_USER -p$DB_PASS -h$DB_HOST -P$DB_PORT -e "SHOW TABLES LIKE 'users';" "$DB_NAME" | grep -q '^users$'; then
+        DB_POPULATED=true
+    else
+        DB_POPULATED=false
+    fi
+else
+    print_error "Can't connect to DB_HOST - Check settings - exiting.."
+    mariadb ${_mysql_ssl} -u$DB_USER -p$DB_PASS -h$DB_HOST -P$DB_PORT -e "SELECT 1;" "$DB_NAME"
+    exit 1
+fi
 mysql -u "$DB_USER" -p"$DB_PASS" -P"${DB_PORT}" -h"$DB_HOST" -e "use ""$DB_NAME""; SELECT * FROM users;" >/dev/null 2>&1
-if [ $? -gt 0 ]; then
-    ### Perform Database Installation Routines
+
+if [ "${DB_POPULATED}" = "false" ]; then
     print_warn "Detected empty Database - Setting up - Please wait.."
     sleep 5
     silent sudo -u "${NGINX_USER}" php artisan migrate --force
@@ -711,7 +730,7 @@ if [ $? -gt 0 ]; then
                     ADMIN_EMAIL \
                     ADMIN_NAME \
                     ADMIN_PASS
-    sudo -u "${NGINX_USER}" php ${NGINX_WEBROOT}/artisan bookstack:create-admin --no-ansi --email="${ADMIN_EMAIL}" --name="${ADMIN_NAME}" --password="${ADMIN_PASS}"
+    sudo -u "${NGINX_USER}" php "${NGINX_WEBROOT%/}"/artisan bookstack:create-admin --no-ansi --email="${ADMIN_EMAIL}" --name="${ADMIN_NAME}" --password="${ADMIN_PASS}"
 fi
 
 custom_files "${CONTAINER_CUSTOM_PATH}" "${NGINX_WEBROOT}" "${NGINX_USER}" "${NGINX_GROUP}"
@@ -725,8 +744,7 @@ print_warn "Running any Database Migrations"
 cd "${NGINX_WEBROOT}"
 silent sudo -u "${NGINX_USER}" php artisan migrate --no-ansi --force
 
-### Add alias for running artisan
-cat <<EOF | silent tee -a /root/.bashrc
+write_file -a /root/.bashrc
 function artisan() {
       export oldpwd="\$(pwd)"
       cd ${NGINX_WEBROOT}

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: © 2025 Nfrastack <code@nfrastack.com>
+# SPDX-FileCopyrightText: © 2026 Nfrastack <code@nfrastack.com>
 #
 # SPDX-License-Identifier: MIT
 
@@ -25,23 +25,25 @@ COPY LICENSE /usr/src/container/LICENSE
 COPY README.md /usr/src/container/README.md
 
 ENV \
-    PHP_MODULE_ENABLE_CREATE_SAMPLE_PHP=FALSE \
-    PHP_MODULE_ENABLE_LDAP=TRUE \
-    PHP_MODULE_ENABLE_SIMPLEXML=TRUE \
-    PHP_MODULE_ENABLE_MEMCACHED=TRUE \
-    PHP_MODULE_ENABLE_PDO=TRUE \
-    PHP_MODULE_ENABLE_PDO_MYSQL=TRUE \
-    PHP_MODULE_ENABLE_FILEINFO=TRUE \
-    PHP_MODULE_ENABLE_TOKENIZER=TRUE \
-    PHP_MODULE_ENABLE_XMLWRITER=TRUE \
-    PHP_MODULE_ENABLE_ZIP=TRUE \
     NGINX_WEBROOT=/www/bookstack \
-    NGINX_SITE_ENABLED=bookstack \
-    CONTAINER_ENABLE_MESSAGING=TRUE \
     IMAGE_NAME="nfrastack/bookstack" \
     IMAGE_REPO_URL="https://github.com/nfrastack/container-bookstack/"
 
 RUN echo "" && \
+    BUILD_ENV=" \
+                10-nginx/NGINX_SITE_ENABLED=bookstack \
+                20-php-fpm/PHP_MODULE_ENABLE_CREATE_SAMPLE_PHP=FALSE \
+                20-php-fpm/PHP_MODULE_ENABLE_LDAP=TRUE \
+                20-php-fpm/PHP_MODULE_ENABLE_SIMPLEXML=TRUE \
+                20-php-fpm/PHP_MODULE_ENABLE_MEMCACHED=TRUE \
+                20-php-fpm/PHP_MODULE_ENABLE_PDO=TRUE \
+                20-php-fpm/PHP_MODULE_ENABLE_PDO_MYSQL=TRUE \
+                20-php-fpm/PHP_MODULE_ENABLE_FILEINFO=TRUE \
+                20-php-fpm/PHP_MODULE_ENABLE_TOKENIZER=TRUE \
+                20-php-fpm/PHP_MODULE_ENABLE_XMLWRITER=TRUE \
+                20-php-fpm/PHP_MODULE_ENABLE_ZIP=TRUE \
+              " \
+              && \
     BOOKSTACK_BUILD_DEPS_ALPINE=" \
                                     git \
                                 " \
