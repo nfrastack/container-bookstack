@@ -17,7 +17,7 @@ LABEL \
         org.opencontainers.image.licenses="MIT"
 
 ARG \
-    BOOKSTACK_VERSION="v26.3" \
+    BOOKSTACK_VERSION="v26.3.1" \
     BOOKSTACK_REPO_URL="https://github.com/BookStackApp/BookStack"
 
 COPY CHANGELOG.md /usr/src/container/CHANGELOG.md
