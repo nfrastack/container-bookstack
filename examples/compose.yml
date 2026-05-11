@@ -1,6 +1,6 @@
 services:
   bookstack-app:
-    image: docker.io/nfrastack/bookstack
+    image: docker.io/nfrastack/bookstack:develop
     container_name: bookstack-app
     labels:
       - traefik.enable=true
@@ -11,6 +11,7 @@ services:
       - ./logs:/logs/
     environment:
       - CONTAINER_NAME=bookstack-app
+      - TIMEZONE=America/Vancouver
 
       - DB_HOST=bookstack-db
       - DB_PORT=3306
@@ -18,7 +19,26 @@ services:
       - DB_USER=bookstack
       - DB_PASS=bookstackpass
 
-      - SITE_URL=https://bookstack.example.com
+      - ADMIN_EMAIL=admin@example.com
+      - ADMIN_NAME=Bookstack Admin
+      - ADMIN_PASS=password
+
+      - SITE_URL=https://bookstack.example.com    # legacy alias for APP_URL
+
+      - MAIL_DRIVER=smtp
+      - MAIL_FROM=bookstack@example.com
+      - MAIL_FROM_NAME=BookStack Test
+      - SMTP_HOST=postfix-relay
+      - SMTP_PORT=25
+      - SMTP_ENCRYPTION=null
+      # - SMTP_USER=...
+      # - SMTP_PASS_FILE=/run/secrets/smtp_password
+
+      # Other BookStack `.env` keys via the BOOKSTACK_ passthrough
+      #- BOOKSTACK_APP_DEBUG=false
+      - BOOKSTACK_APP_LANG=en
+      - BOOKSTACK_APP_AUTO_LANG_PUBLIC=false
+      - BOOKSTACK_APP_TIMEZONE=America/Vancouver
     networks:
       - proxy
       - services
@@ -30,7 +50,8 @@ services:
     volumes:
       - ./db:/data
     environment:
-      - ROOT_PASS=password
+      - DEBUG_MODE=FALSE
+      - ROOT_PASS=rootpassword
       - DB_NAME=bookstack
       - DB_USER=bookstack
       - DB_PASS=bookstackpass
@@ -41,8 +62,6 @@ services:
   bookstack-db-backup:
     image: docker.io/tiredofit/db-backup
     container_name: bookstack-db-backup
-    links:
-      - bookstack-db
     volumes:
       - ./dbbackup:/backup
     environment:

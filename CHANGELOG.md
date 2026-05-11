@@ -1,3 +1,11 @@
+## 2.0.0 2026-05-11 <code at nfrastack dot com>
+
+   ### Added
+      - Changed Base Image to nfrastack/laravel
+      - BookStack 2026.3.4
+      - Most variables need to be prefixed with BOOKSTACK_ to be usable - see README
+
+
 ## 1.10.0pre 2024-08-08 <code at nfrastack dot com>
 
    ### Changed

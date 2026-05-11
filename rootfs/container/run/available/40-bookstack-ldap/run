@@ -1,0 +1,56 @@
+#!/command/with-contenv bash
+# SPDX-FileCopyrightText: © 2026 Nfrastack <code@nfrastack.com>
+#
+# SPDX-License-Identifier: MIT
+
+source /container/base/functions/container/init
+prepare_service 40-bookstack-ldap
+SERVICE_NAME="bookstack-ldap-sync"
+
+check_container_initialized
+check_service_initialized init 40-bookstack
+liftoff
+
+if [ "${AUTHENTICATION_TYPE,,}" = "ldap" ] && var_true "${ENABLE_LDAP_SYNC_USER}" ; then
+    print_debug "LDAP Sync routines Initialized"
+
+    ### Wait for Next time to start Syncing
+    if [ -z "${LDAP_SYNC_BEGIN}" ] ; then
+      LDAP_SYNC_BEGIN=+0
+    fi
+
+    current_time=$(date +"%s")
+    today=$(date +"%Y%m%d")
+
+    if [[ $LDAP_SYNC_BEGIN =~ ^\+(.*)$ ]]; then
+        waittime=$(( ${BASH_REMATCH[1]} * 60 ))
+    else
+        target_time=$(date --date="${today}${LDAP_SYNC_BEGIN}" +"%s")
+        if [[ "$target_time" < "$current_time" ]]; then
+          target_time=$(($target_time + 24*60*60))
+        fi
+        waittime=$(($target_time - $current_time))
+    fi
+
+    print_notice "Next LDAP Sync at $(date -d @${target_time} +"%Y-%m-%d %T %Z")"
+    sleep $waittime
+
+    while true; do
+        now=$(date +"%Y%m%d-%H%M%S")
+        now_time=$(date +"%H:%M:%S")
+        now_date=$(date +"%Y-%m-%d")
+
+        if [ -f "/override/custom-scripts/ldapsync.sh" ] ; then
+            /override/custom-scripts/ldapsync.sh
+        else
+            print_notice "Synchronizing LDAP at $(date)"
+            cd "${NGINX_WEBROOT}"
+            silent sudo -u "${NGINX_USER}" php artisan bookstack:syncldap
+            print_notice "Completed synchronizing LDAP at $(date)"
+        fi
+
+        sleep $(($LDAP_SYNC_INTERVAL*60))
+    done
+else
+    s6-svc -d /var/run/s6/legacy-services/40-bookstack-ldap
+fi

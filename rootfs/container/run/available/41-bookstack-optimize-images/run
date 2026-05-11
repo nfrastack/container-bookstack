@@ -1,0 +1,49 @@
+#!/command/with-contenv bash
+# SPDX-FileCopyrightText: © 2026 Nfrastack <code@nfrastack.com>
+#
+# SPDX-License-Identifier: MIT
+
+source /container/base/functions/container/init
+prepare_service 41-bookstack-optimize-images
+SERVICE_NAME="bookstack-optimize-images"
+
+check_container_initialized
+check_service_initialized init 40-bookstack
+liftoff
+
+### Perform Image Optimization on uploaded assets
+if var_true "${ENABLE_OPTIMIZE_IMAGES}" ; then
+    print_debug "Image Optimization routines initialized"
+
+    current_time=$(date +"%s")
+    today=$(date +"%Y%m%d")
+
+    if [[ $OPTIMIZE_IMAGES_BEGIN =~ ^\+(.*)$ ]]; then
+        waittime=$(( ${BASH_REMATCH[1]} * 60 ))
+    else
+        target_time=$(date --date="${today}${OPTIMIZE_IMAGES_BEGIN}" +"%s")
+        if [[ "$target_time" < "$current_time" ]]; then
+            target_time=$(($target_time + 24*60*60))
+        fi
+        waittime=$(($target_time - $current_time))
+    fi
+
+    print_notice "Next Image Optimization at $(date -d @${target_time} +"%Y-%m-%d %T %Z")"
+    sleep ${waittime}
+n
+    while true; do
+        now=$(date +"%Y%m%d-%H%M%S")
+        now_time=$(date +"%H:%M:%S")
+        now_date=$(date +"%Y-%m-%d")
+        print_notice "Optimizing Images starting at $(date)"
+        find /data/uploads/images/ -maxdepth 4 -type d -print0 | while IFS= read -rd '' dir; do cd ${dir} ; optipng *.png > /dev/null 2>&1 ; done
+        find /data/uploads/images/ -maxdepth 4 -type d -print0 | while IFS= read -rd '' dir; do cd ${dir} ; jpegoptim *.jpeg > /dev/null 2>&1 ; done
+        find /data/uploads/images/ -maxdepth 4 -type d -print0 | while IFS= read -rd '' dir; do cd ${dir} ; jpegoptim *.jpg > /dev/null 2>&1 ; done
+        print_notice "Optimizing Images completed at $(date)"
+
+        ### Go back to Sleep until next Backup time
+        sleep $(($OPTIMIZE_IMAGES_INTERVAL*60))
+    done
+else
+    s6-svc -d /var/run/s6/legacy-services/41-bookstack-optimize-images
+fi

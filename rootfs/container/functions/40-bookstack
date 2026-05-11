@@ -1,0 +1,178 @@
+# SPDX-FileCopyrightText: © 2026 Nfrastack <code@nfrastack.com>
+#
+# SPDX-License-Identifier: MIT
+
+bookstack_compare_version() {
+    local _bookstack_image_version
+    local _bookstack_current_version
+    local _bookstack_version_file
+    local _bookstack_timestamp
+
+    _bookstack_image_version=$(grep -o "ADD: BookStack .* |" "/container/build/${IMAGE_NAME//\//_}/build.log" 2>/dev/null | awk '{print $3}')
+    _bookstack_version_file="${NGINX_WEBROOT%/}/.bookstack-version"
+    _bookstack_timestamp=$(TZ=${TIMEZONE} date +'%Y-%m-%d %H:%M:%S %Z')
+
+    if [ -n "${_bookstack_image_version}" ]; then
+        if [ -f "${_bookstack_version_file}" ]; then
+            if var_true "${ENABLE_AUTO_UPDATE}"; then
+                _bookstack_current_version=$(head -n 1 "${_bookstack_version_file}" | awk '{print $1}')
+                if [ "${_bookstack_image_version}" != "${_bookstack_current_version}" ]; then
+                    print_warn "Detected in-place BookStack ${_bookstack_current_version} - upgrading to ${_bookstack_image_version}"
+                    cp -aR "${LARAVEL_INSTALL_DATA_PATH%/}"/install/. "${NGINX_WEBROOT%/}/"
+                    chown -R "${NGINX_USER}":"${NGINX_GROUP}" "${NGINX_WEBROOT}"
+                    if cd "${NGINX_WEBROOT}"; then
+                        silent sudo -u "${NGINX_USER}" php "${NGINX_WEBROOT%/}"/artisan migrate --force
+                        sed -i --follow-symlinks "1i ${_bookstack_image_version} upgraded on ${_bookstack_timestamp}" "${_bookstack_version_file}"
+                    fi
+                fi
+            fi
+        else
+            echo "${_bookstack_image_version} first installed on ${_bookstack_timestamp}" \
+                | write_file "${NGINX_USER}":"${NGINX_GROUP}"@"${_bookstack_version_file}":660
+        fi
+    fi
+}
+
+bookstack_bootstrap_volatile_data() {
+    if var_true "${ENABLE_STORAGE_REDIRECTION}"; then
+        create_folder "${DATA_PATH}" "${NGINX_USER}":"${NGINX_GROUP}" 750
+
+        if [ "${UPLOADS_PATH%/}" != "${NGINX_WEBROOT%/}/public/uploads" ]; then
+            if [ ! -d "${UPLOADS_PATH%/}" ]; then
+                if [ -d "${NGINX_WEBROOT%/}"/public/uploads ]; then
+                    cp -R "${NGINX_WEBROOT%/}"/public/uploads "${UPLOADS_PATH%/}"
+                fi
+            fi
+            if [ ! -L "${NGINX_WEBROOT%/}"/public/uploads ]; then
+                rm -rf "${NGINX_WEBROOT%/}"/public/uploads
+                ln -s "${UPLOADS_PATH%/}" "${NGINX_WEBROOT%/}"/public/uploads
+            fi
+            chown -R "${NGINX_USER}":"${NGINX_GROUP}" "${UPLOADS_PATH%/}"
+        fi
+
+        if [ "${THEMES_PATH%/}" != "${NGINX_WEBROOT%/}/themes" ]; then
+            if [ ! -d "${THEMES_PATH%/}" ]; then
+                if [ -d "${NGINX_WEBROOT%/}"/themes ]; then
+                    cp -R "${NGINX_WEBROOT%/}"/themes "${THEMES_PATH%/}"
+                fi
+            fi
+            if [ ! -L "${NGINX_WEBROOT%/}"/themes ]; then
+                rm -rf "${NGINX_WEBROOT%/}"/themes
+                ln -s "${THEMES_PATH%/}" "${NGINX_WEBROOT%/}"/themes
+            fi
+        fi
+
+        if [ -f "${NGINX_WEBROOT%/}"/.bookstack-version ]; then
+            if [ ! -L "${NGINX_WEBROOT%/}"/.bookstack-version ]; then
+                if [ ! -e "${DATA_PATH%/}/.bookstack-version" ]; then
+                    mv "${NGINX_WEBROOT%/}"/.bookstack-version "${DATA_PATH%/}/.bookstack-version"
+                fi
+            fi
+        fi
+        if [ ! -L "${NGINX_WEBROOT%/}"/.bookstack-version ]; then
+            rm -f "${NGINX_WEBROOT%/}"/.bookstack-version
+            ln -s "${DATA_PATH%/}/.bookstack-version" "${NGINX_WEBROOT%/}"/.bookstack-version
+        fi
+        if [ -L "${NGINX_WEBROOT%/}"/.bookstack-version ]; then
+            chown -h "${NGINX_USER}":"${NGINX_GROUP}" "${NGINX_WEBROOT%/}"/.bookstack-version
+        fi
+    fi
+}
+
+bookstack_configure_app() {
+    if [ -z "${APP_URL}" ]; then
+        if [ -n "${SITE_URL}" ]; then
+            APP_URL="${SITE_URL}"
+        fi
+    fi
+    sanity_var APP_URL "APP_URL or SITE_URL (full external URL of the site eg https://bookstack.example.com)"
+    laravel_env_update APP_URL "${APP_URL}"
+
+    if [ -n "${STORAGE_TYPE}" ]; then
+        laravel_env_update STORAGE_TYPE "${STORAGE_TYPE}"
+    fi
+
+    if [ -n "${MAIL_DRIVER}" ]; then
+        laravel_env_update MAIL_DRIVER "${MAIL_DRIVER}"
+    fi
+    if [ -n "${MAIL_FROM_NAME}" ]; then
+        laravel_env_update MAIL_FROM_NAME "${MAIL_FROM_NAME}"
+    fi
+    if [ -n "${MAIL_FROM}" ]; then
+        laravel_env_update MAIL_FROM "${MAIL_FROM}"
+    fi
+
+    if [ -z "${MAIL_HOST}" ]; then
+        if [ -n "${SMTP_HOST}" ]; then
+            MAIL_HOST="${SMTP_HOST}"
+        fi
+    fi
+    if [ -n "${MAIL_HOST}" ]; then
+        laravel_env_update MAIL_HOST "${MAIL_HOST}"
+    fi
+    if [ -z "${MAIL_PORT}" ]; then
+        if [ -n "${SMTP_PORT}" ]; then
+            MAIL_PORT="${SMTP_PORT}"
+        fi
+    fi
+    if [ -n "${MAIL_PORT}" ]; then
+        laravel_env_update MAIL_PORT "${MAIL_PORT}"
+    fi
+
+    transform_var file \
+                        MAIL_USERNAME \
+                        MAIL_PASSWORD \
+                        SMTP_USER \
+                        SMTP_PASS
+    if [ -z "${MAIL_USERNAME}" ]; then
+        if [ -n "${SMTP_USER}" ]; then
+            MAIL_USERNAME="${SMTP_USER}"
+        fi
+    fi
+    if [ -n "${MAIL_USERNAME}" ]; then
+        laravel_env_update MAIL_USERNAME "${MAIL_USERNAME}"
+    fi
+    if [ -z "${MAIL_PASSWORD}" ]; then
+        if [ -n "${SMTP_PASS}" ]; then
+            MAIL_PASSWORD="${SMTP_PASS}"
+        fi
+    fi
+    if [ -n "${MAIL_PASSWORD}" ]; then
+        laravel_env_update MAIL_PASSWORD "${MAIL_PASSWORD}"
+    fi
+
+    if [ -z "${MAIL_ENCRYPTION}" ]; then
+        if [ -n "${SMTP_ENCRYPTION}" ]; then
+            MAIL_ENCRYPTION="${SMTP_ENCRYPTION}"
+        fi
+    fi
+    if [ -n "${MAIL_ENCRYPTION}" ]; then
+        laravel_env_update MAIL_ENCRYPTION "${MAIL_ENCRYPTION}"
+    fi
+}
+
+bookstack_configure_sso() {
+    transform_var file \
+                        APP_SSO_KEY \
+                        APP_SSO_DISCOVER
+
+    sanity_var APP_SSO_KEY      "Request header name)"
+    sanity_var APP_SSO_DISCOVER "Header attribute)"
+
+    laravel_env_update APP_SSO_KEY      "${APP_SSO_KEY}"
+    laravel_env_update APP_SSO_DISCOVER "${APP_SSO_DISCOVER}"
+}
+
+bookstack_create_admin() {
+    transform_var file \
+                        ADMIN_EMAIL \
+                        ADMIN_NAME \
+                        ADMIN_PASS
+    print_notice "Creating BookStack administrative user '${ADMIN_EMAIL}'"
+    silent sudo -u "${NGINX_USER}" php "${NGINX_WEBROOT%/}"/artisan \
+                            bookstack:create-admin \
+                                --no-ansi \
+                                --email="${ADMIN_EMAIL}" \
+                                --name="${ADMIN_NAME}" \
+                                --password="${ADMIN_PASS}"
+}

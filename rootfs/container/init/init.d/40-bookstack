@@ -1,0 +1,50 @@
+#!/command/with-contenv bash
+# SPDX-FileCopyrightText: © 2026 Nfrastack <code@nfrastack.com>
+#
+# SPDX-License-Identifier: MIT
+
+source /container/base/functions/container/init
+prepare_service 30-laravel,40-bookstack
+SERVICE_NAME="bookstack"
+
+sanity_db
+db_ready mariadb
+
+bookstack_bootstrap_volatile_data
+
+if [ "${SETUP_TYPE,,}" = "auto" ]; then
+    print_notice "Generating BookStack Configuration"
+    bookstack_compare_version
+    bookstack_configure_app
+
+    if var_true "${ENABLE_SSO}" ; then
+        bookstack_configure_sso
+    fi
+
+    silent sudo -u "${NGINX_USER}" php "${NGINX_WEBROOT%/}"/artisan key:generate --force
+
+    if laravel_db_is_populated; then
+        print_info "DB schema present - running migrations only"
+        silent sudo -u "${NGINX_USER}" php "${NGINX_WEBROOT%/}"/artisan migrate --no-ansi --force
+    else
+        print_warn "Empty database detected - migrating + creating admin user"
+        sleep 2
+        silent sudo -u "${NGINX_USER}" php "${NGINX_WEBROOT%/}"/artisan migrate --force
+        bookstack_create_admin
+    fi
+
+    custom_files "${CONTAINER_CUSTOM_PATH}" "${NGINX_WEBROOT}" "${NGINX_USER}" "${NGINX_GROUP}"
+    custom_scripts
+
+    laravel_env_passthrough
+
+    silent sudo -u "${NGINX_USER}" php "${NGINX_WEBROOT%/}"/artisan cache:clear
+    silent sudo -u "${NGINX_USER}" php "${NGINX_WEBROOT%/}"/artisan view:clear
+    print_info "Initialization Complete. Please visit ${APP_URL:-${SITE_URL}} and login with your credentials."
+else
+    print_warn "SETUP_TYPE='${SETUP_TYPE}' (not 'auto') - skipping config generation, migrations, admin bootstrap"
+    print_warn "On a fresh database the schema will NOT be created and the app will fail to boot."
+    print_warn "Set SETUP_TYPE=AUTO or run migrations / configure .env yourself."
+fi
+
+liftoff
