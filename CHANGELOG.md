@@ -1,3 +1,9 @@
+## 2.0.2 2026-05-28 <code at nfrastack dot com>
+
+   ### Added
+      - BookStack 26.05
+
+
 ## 2.0.1 2026-05-21 <code at nfrastack dot com>
 
    ### Added

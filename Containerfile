@@ -2,8 +2,6 @@
 #
 # SPDX-License-Identifier: MIT
 
-ARG BASE_IMAGE=docker.io/nfrastack/laravel:latest
-
 FROM ${BASE_IMAGE}
 
 LABEL \
@@ -17,7 +15,7 @@ LABEL \
         org.opencontainers.image.licenses="MIT"
 
 ARG \
-    BOOKSTACK_VERSION="v26.03.5" \
+    BOOKSTACK_VERSION="v26.05" \
     BOOKSTACK_REPO_URL="https://github.com/BookStackApp/BookStack"
 
 COPY CHANGELOG.md /usr/src/container/CHANGELOG.md
